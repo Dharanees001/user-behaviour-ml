@@ -731,8 +731,8 @@ def save_best_model(report, scaler):
     joblib.dump(bundle, "best_model.pkl")
     print(f"      ✓ Best model : {best_name.replace(chr(10), ' ')}")
     print(f"      ✓ Accuracy   : {best_data['accuracy'] * 100:.2f}%")
-    print(f"      ✓ Saved to   : best_model.pkl")
-    print(f"      ℹ LWR excluded from selection (lazy learner)")
+    print("      ✓ Saved to   : best_model.pkl")
+    print("      ℹ LWR excluded from selection (lazy learner)")
     return best_name, best_data["accuracy"]
 
 
@@ -770,7 +770,7 @@ def main():
     print("\n" + "═" * 62)
     print("  ML PIPELINE — User Behaviour Classification")
     print(f"  Dataset  : {DATASET_CSV}")
-    print(f"  Target   : User Behavior Class → Low / Medium / High")
+    print("  Target   : User Behavior Class → Low / Medium / High")
     print(f"  Features : {len(SELECTED_FEATURES)} selected (User_ID & Device_Model dropped)")
     print("═" * 62 + "\n")
 
