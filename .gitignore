@@ -8,5 +8,4 @@ venv/
 dist/
 build/
 .DS_Store
-best_model.pkl
 ml_results_dashboard.png
