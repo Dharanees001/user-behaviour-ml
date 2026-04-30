@@ -133,7 +133,7 @@ jobs:
           [ -f "${{ env.DASHBOARD_ARTIFACT }}" ] && echo "✓ Dashboard PNG found"       || (echo "✗ Dashboard PNG missing"       && exit 1)
 
       - name: Log best model
-        run: MPLBACKEND=Agg python -c "import main; import joblib; b = joblib.load('${{ env.MODEL_ARTIFACT }}'); print('Best model :', b['model_name']); print('Accuracy   :', round(b['accuracy']*100,2)); print('Features   :', b['features'])"
+        run: MPLBACKEND=Agg python validate_model.py
 
       - name: Upload best_model.pkl
         uses: actions/upload-artifact@v4
