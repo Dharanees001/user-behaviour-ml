@@ -5,15 +5,15 @@ Includes all model class definitions so joblib can load best_model.pkl
 
 import os
 import warnings
+
 import joblib
 import numpy as np
-
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-from sklearn.svm import SVC
 from sklearn.cluster import KMeans
-from sklearn.tree import DecisionTreeClassifier, export_text
 from sklearn.metrics import accuracy_score
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier, export_text
 
 warnings.filterwarnings("ignore")
 np.random.seed(42)
@@ -88,14 +88,19 @@ class SVMClassifier:
 
     def fit_best(self, X_train, y_train):
         from sklearn.model_selection import cross_val_score
+
         for kernel in ["rbf", "linear", "poly"]:
             clf = SVC(kernel=kernel, C=1.0, gamma="scale", probability=True, random_state=42)
             cv = cross_val_score(clf, X_train, y_train, cv=5, scoring="accuracy")
             self.kernel_scores[kernel] = cv.mean()
         self.best_kernel = max(self.kernel_scores, key=self.kernel_scores.get)
         self.best_model = SVC(
-            kernel=self.best_kernel, C=1.0, gamma="scale",
-            probability=True, random_state=42, decision_function_shape="ovr"
+            kernel=self.best_kernel,
+            C=1.0,
+            gamma="scale",
+            probability=True,
+            random_state=42,
+            decision_function_shape="ovr",
         )
         self.best_model.fit(X_train, y_train)
         return self
@@ -117,7 +122,7 @@ class ClusteringClassifier:
     def fit(self, X, y):
         self.kmeans.fit(X)
         for c in range(self.n_clusters):
-            mask = (self.kmeans.labels_ == c)
+            mask = self.kmeans.labels_ == c
             if mask.sum() > 0:
                 vals, counts = np.unique(y[mask], return_counts=True)
                 self.cluster_label[c] = int(vals[np.argmax(counts)])
@@ -136,8 +141,7 @@ class DecisionTreeRuleLearner:
 
     def __init__(self, max_depth=6):
         self.tree = DecisionTreeClassifier(
-            max_depth=max_depth, min_samples_split=10,
-            min_samples_leaf=5, criterion="gini", random_state=42
+            max_depth=max_depth, min_samples_split=10, min_samples_leaf=5, criterion="gini", random_state=42
         )
         self.feature_names = None
 
@@ -269,22 +273,32 @@ def predict_route():
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
 
     try:
-        features = np.array([[
-            float(data["app_usage"]), float(data["screen_on"]),
-            float(data["battery"]), float(data["apps"]),
-            float(data["data_usage"]), float(data["age"]),
-            int(data["gender"]), int(data["os"]),
-        ]])
+        features = np.array(
+            [
+                [
+                    float(data["app_usage"]),
+                    float(data["screen_on"]),
+                    float(data["battery"]),
+                    float(data["apps"]),
+                    float(data["data_usage"]),
+                    float(data["age"]),
+                    int(data["gender"]),
+                    int(data["os"]),
+                ]
+            ]
+        )
         scaled = bundle["scaler"].transform(features)
         pred = int(bundle["model"].predict(scaled)[0])
         label = bundle.get("labels", {}).get(pred, ["Low", "Medium", "High"][pred])
-        return jsonify({
-            "class": pred,
-            "label": label,
-            "description": LABEL_DESC.get(pred, ""),
-            "model_name": bundle.get("model_name", "Unknown"),
-            "accuracy": round(bundle.get("accuracy", 0) * 100, 2),
-        })
+        return jsonify(
+            {
+                "class": pred,
+                "label": label,
+                "description": LABEL_DESC.get(pred, ""),
+                "model_name": bundle.get("model_name", "Unknown"),
+                "accuracy": round(bundle.get("accuracy", 0) * 100, 2),
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

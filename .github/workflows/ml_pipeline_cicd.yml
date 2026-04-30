@@ -9,9 +9,9 @@ on:
 
 env:
   PYTHON_VERSION: "3.10"
-  DATASET_FILE: "dkmlproject/user_behaviour_dataset.csv"
-  MODEL_ARTIFACT: "dkmlproject/best_model.pkl"
-  DASHBOARD_ARTIFACT: "dkmlproject/ml_results_dashboard.png"
+  DATASET_FILE: "user_behaviour_dataset.csv"
+  MODEL_ARTIFACT: "best_model.pkl"
+  DASHBOARD_ARTIFACT: "ml_results_dashboard.png"
 
 jobs:
 
@@ -122,7 +122,6 @@ jobs:
       - name: Train models
         run: |
           export MPLBACKEND=Agg
-          cd dkmlproject
           python main.py
 
       - name: Verify outputs
@@ -170,6 +169,12 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -179,13 +184,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: best-model
-          path: dkmlproject/
+          path: .
 
       - name: Validate accuracy threshold (≥ 75%)
         run: |
           python -c "
           import joblib, sys
-          b = joblib.load('dkmlproject/best_model.pkl')
+          b = joblib.load('best_model.pkl')
           acc = b['accuracy'] * 100
           print(f'Model     : {b[\"model_name\"]}')
           print(f'Accuracy  : {acc:.2f}%')
@@ -199,7 +204,7 @@ jobs:
         run: |
           python -c "
           import joblib, numpy as np
-          b = joblib.load('dkmlproject/best_model.pkl')
+          b = joblib.load('best_model.pkl')
           X = np.array([[120, 5.0, 1500, 30, 500, 25, 1, 1]])
           X_scaled = b['scaler'].transform(X)
           if 'Locally Weighted' not in b['model_name']:
@@ -226,13 +231,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: best-model
-          path: dkmlproject/
+          path: .
 
       - name: Download dashboard
         uses: actions/download-artifact@v4
         with:
           name: ml-dashboard
-          path: dkmlproject/
+          path: .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -256,8 +261,8 @@ jobs:
 
             > Auto-deployed by GitHub Actions
           files: |
-            dkmlproject/best_model.pkl
-            dkmlproject/ml_results_dashboard.png
+            best_model.pkl
+            ml_results_dashboard.png
           draft: false
           prerelease: false
         env:
