@@ -34,6 +34,7 @@ jobs:
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-lint-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-lint-
 
       - name: Install linting tools
         run: pip install flake8 black isort
@@ -68,6 +69,7 @@ jobs:
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -107,6 +109,7 @@ jobs:
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -130,14 +133,7 @@ jobs:
           [ -f "${{ env.DASHBOARD_ARTIFACT }}" ] && echo "✓ Dashboard PNG found"       || (echo "✗ Dashboard PNG missing"       && exit 1)
 
       - name: Log best model
-        run: |
-          python -c "
-          import joblib
-          b = joblib.load('${{ env.MODEL_ARTIFACT }}')
-          print(f'Best model : {b[\"model_name\"]}')
-          print(f'Accuracy   : {b[\"accuracy\"]*100:.2f}%')
-          print(f'Features   : {b[\"features\"]}')
-          "
+        run: MPLBACKEND=Agg python -c "import main; import joblib; b = joblib.load('${{ env.MODEL_ARTIFACT }}'); print('Best model :', b['model_name']); print('Accuracy   :', round(b['accuracy']*100,2)); print('Features   :', b['features'])"
 
       - name: Upload best_model.pkl
         uses: actions/upload-artifact@v4
@@ -174,6 +170,7 @@ jobs:
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -186,33 +183,8 @@ jobs:
           name: best-model
           path: .
 
-      - name: Validate accuracy threshold (≥ 75%)
-        run: |
-          python -c "
-          import joblib, sys
-          b = joblib.load('best_model.pkl')
-          acc = b['accuracy'] * 100
-          print(f'Model     : {b[\"model_name\"]}')
-          print(f'Accuracy  : {acc:.2f}%')
-          if acc < 75.0:
-              print('✗ FAILED — below 75% threshold')
-              sys.exit(1)
-          print('✓ PASSED')
-          "
-
-      - name: Validate prediction
-        run: |
-          python -c "
-          import joblib, numpy as np
-          b = joblib.load('best_model.pkl')
-          X = np.array([[120, 5.0, 1500, 30, 500, 25, 1, 1]])
-          X_scaled = b['scaler'].transform(X)
-          if 'Locally Weighted' not in b['model_name']:
-              pred = b['model'].predict(X_scaled)
-              print(f'✓ Prediction: class {pred[0]} ({b[\"labels\"][pred[0]]})')
-          else:
-              print('ℹ LWR — prediction test skipped')
-          "
+      - name: Validate model
+        run: MPLBACKEND=Agg python validate_model.py
 
 
   # ══════════════════════════════════════════
