@@ -24,13 +24,13 @@ import matplotlib.gridspec as gridspec
 import joblib
 
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing   import StandardScaler
-from sklearn.metrics         import (accuracy_score, classification_report,
-                                     confusion_matrix, ConfusionMatrixDisplay)
-from sklearn.svm             import SVC
-from sklearn.cluster         import KMeans
-from sklearn.tree            import DecisionTreeClassifier, export_text
-from sklearn.linear_model    import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import (accuracy_score, classification_report,
+                             confusion_matrix, ConfusionMatrixDisplay)
+from sklearn.svm import SVC
+from sklearn.cluster import KMeans
+from sklearn.tree import DecisionTreeClassifier, export_text
+from sklearn.linear_model import LogisticRegression
 
 warnings.filterwarnings("ignore")
 np.random.seed(42)
@@ -54,6 +54,8 @@ SELECTED_FEATURES = [
 ]
 
 # Map raw User_Behavior_Class (1–5) → 3 readable classes
+
+
 def behaviour_to_label(cls):
     if cls in [1, 2]:
         return 0   # Low
@@ -61,6 +63,7 @@ def behaviour_to_label(cls):
         return 1   # Medium
     else:          # 4, 5
         return 2   # High
+
 
 LABEL_NAMES = {0: "Low", 1: "Medium", 2: "High"}
 
@@ -95,16 +98,24 @@ def load_dataset(csv_path: str) -> pd.DataFrame:
     col_map = {}
     for col in df_raw.columns:
         cl = col.lower()
-        if "app_usage"    in cl or "app usage"    in cl: col_map["App_Usage_Time"]     = col
-        if "screen"       in cl:                          col_map["Screen_On_Time"]      = col
-        if "battery"      in cl:                          col_map["Battery_Drain"]       = col
-        if "apps_install" in cl or "apps install" in cl: col_map["Num_Apps_Installed"]  = col
-        if "data_usage"   in cl or "data usage"   in cl: col_map["Data_Usage"]          = col
-        if cl == "age":                                   col_map["Age"]                 = col
-        if "gender"       in cl:                          col_map["Gender_raw"]          = col
-        if "operating"    in cl or "os" == cl:            col_map["OS_raw"]              = col
+        if "app_usage" in cl or "app usage" in cl:
+            col_map["App_Usage_Time"] = col
+        if "screen" in cl:
+            col_map["Screen_On_Time"] = col
+        if "battery" in cl:
+            col_map["Battery_Drain"] = col
+        if "apps_install" in cl or "apps install" in cl:
+            col_map["Num_Apps_Installed"] = col
+        if "data_usage" in cl or "data usage" in cl:
+            col_map["Data_Usage"] = col
+        if cl == "age":
+            col_map["Age"] = col
+        if "gender" in cl:
+            col_map["Gender_raw"] = col
+        if "operating" in cl or "os" == cl:
+            col_map["OS_raw"] = col
         if "behavior_class" in cl or "behaviour_class" in cl or "user_behavior" in cl:
-                                                          col_map["Target"]              = col
+            col_map["Target"] = col
 
     required = ["App_Usage_Time", "Screen_On_Time", "Battery_Drain",
                 "Num_Apps_Installed", "Data_Usage", "Age", "Target"]
@@ -149,7 +160,7 @@ def load_dataset(csv_path: str) -> pd.DataFrame:
     counts = df_final["result"].value_counts().sort_index()
     for cls_id, cls_name in LABEL_NAMES.items():
         n = counts.get(cls_id, 0)
-        print(f"      ✓ {cls_name:7s} (class {cls_id}): {n:4d} rows ({n/len(df_final)*100:.1f}%)")
+        print(f"      ✓ {cls_name:7s} (class {cls_id}): {n:4d} rows ({n / len(df_final) * 100:.1f}%)")
     print(f"      ✓ Total rows       : {len(df_final)}")
     print(f"      ✓ Features used    : {SELECTED_FEATURES}")
     return df_final
@@ -169,9 +180,9 @@ def preprocess(df: pd.DataFrame):
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    scaler  = StandardScaler()
+    scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train_raw)
-    X_test  = scaler.transform(X_test_raw)
+    X_test = scaler.transform(X_test_raw)
 
     print(f"      ✓ Train : {X_train.shape[0]} samples | Test: {X_test.shape[0]} samples")
     print(f"      ✓ Features: {X_train.shape[1]}")
@@ -195,7 +206,7 @@ class LocallyWeightedRegression:
         self.max_train_samples = max_train_samples
 
     def _gaussian_weights(self, X_train, x_query):
-        diff      = X_train - x_query
+        diff = X_train - x_query
         distances = np.sum(diff ** 2, axis=1)
         return np.exp(-distances / (2 * self.tau ** 2))
 
@@ -204,13 +215,13 @@ class LocallyWeightedRegression:
 
     def predict(self, X_train, y_train, X_test):
         if len(X_train) > self.max_train_samples:
-            idx     = np.random.choice(len(X_train), self.max_train_samples, replace=False)
+            idx = np.random.choice(len(X_train), self.max_train_samples, replace=False)
             X_train = X_train[idx]
             y_train = y_train[idx]
 
-        classes   = np.unique(y_train)
+        classes = np.unique(y_train)
         X_train_b = self._add_bias(X_train)
-        X_test_b  = self._add_bias(X_test)
+        X_test_b = self._add_bias(X_test)
         all_scores = np.zeros((X_test.shape[0], len(classes)))
 
         for i, x_q in enumerate(X_test):
@@ -229,7 +240,6 @@ class LocallyWeightedRegression:
 # ═══════════════════════════════════════════════════════════════════════
 
 
-
 class WeightedRegression:
     """
     Weighted Logistic Regression — upweights borderline/hard samples.
@@ -239,7 +249,7 @@ class WeightedRegression:
 
     def __init__(self, strategy: str = "distance"):
         self.strategy = strategy
-        self.model    = LogisticRegression(max_iter=2000, random_state=42, multi_class="auto")
+        self.model = LogisticRegression(max_iter=2000, random_state=42, multi_class="auto")
 
     def _compute_weights(self, X, y):
         if self.strategy == "uniform":
@@ -248,17 +258,17 @@ class WeightedRegression:
         elif self.strategy == "distance":
             weights = np.ones(X.shape[0])
             for cls in np.unique(y):
-                centroid      = X[y == cls].mean(axis=0)
-                dist          = np.linalg.norm(X - centroid, axis=1) + 1e-6
-                mask          = (y == cls)
+                centroid = X[y == cls].mean(axis=0)
+                dist = np.linalg.norm(X - centroid, axis=1) + 1e-6
+                mask = (y == cls)
                 weights[mask] = 1.0 / dist[mask]
             return weights / weights.sum() * len(weights)
 
         elif self.strategy == "confidence":
             base = LogisticRegression(max_iter=500, random_state=42, multi_class="auto")
             base.fit(X, y)
-            proba   = base.predict_proba(X)
-            max_p   = proba.max(axis=1)
+            proba = base.predict_proba(X)
+            max_p = proba.max(axis=1)
             weights = 1.0 - max_p + 0.1
             return weights / weights.sum() * len(weights)
 
@@ -280,24 +290,25 @@ class WeightedRegression:
 # SECTION 5 — MODEL 3: SVM CLASSIFIER
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class SVMClassifier:
     """SVM with auto kernel selection via 5-fold CV. Supports multiclass."""
 
     def __init__(self):
-        self.best_kernel   = None
-        self.best_model    = None
+        self.best_kernel = None
+        self.best_model = None
         self.kernel_scores = {}
 
     def fit_best(self, X_train, y_train, X_test, y_test):
         for kernel in ["rbf", "linear", "poly"]:
             clf = SVC(kernel=kernel, C=1.0, gamma="scale",
                       probability=True, random_state=42, decision_function_shape="ovr")
-            cv  = cross_val_score(clf, X_train, y_train, cv=5, scoring="accuracy")
+            cv = cross_val_score(clf, X_train, y_train, cv=5, scoring="accuracy")
             self.kernel_scores[kernel] = cv.mean()
-            print(f"        SVM {kernel:6s} CV accuracy: {cv.mean()*100:.2f}%")
+            print(f"        SVM {kernel:6s} CV accuracy: {cv.mean() * 100:.2f}%")
 
         self.best_kernel = max(self.kernel_scores, key=self.kernel_scores.get)
-        self.best_model  = SVC(
+        self.best_model = SVC(
             kernel=self.best_kernel, C=1.0, gamma="scale",
             probability=True, random_state=42, decision_function_shape="ovr"
         )
@@ -319,8 +330,8 @@ class ClusteringClassifier:
     """KMeans clustering with majority-class label assignment per cluster."""
 
     def __init__(self, n_clusters: int = 12):
-        self.n_clusters    = n_clusters
-        self.kmeans        = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        self.n_clusters = n_clusters
+        self.kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
         self.cluster_label = {}
 
     def fit(self, X, y):
@@ -389,11 +400,11 @@ class RuleBasedClassifier:
     """
 
     def __init__(self):
-        self.rules   = []
+        self.rules = []
         self.default = 0
 
     def _extract_rules(self, tree_clf, feature_names):
-        t     = tree_clf.tree_
+        t = tree_clf.tree_
         rules = []
 
         def recurse(node, conditions):
@@ -402,8 +413,8 @@ class RuleBasedClassifier:
                 rules.append((list(conditions), int(leaf_class)))
                 return
             feat = t.feature[node]
-            thr  = t.threshold[node]
-            recurse(t.children_left[node],  conditions + [(feat, thr, "left")])
+            thr = t.threshold[node]
+            recurse(t.children_left[node], conditions + [(feat, thr, "left")])
             recurse(t.children_right[node], conditions + [(feat, thr, "right")])
 
         recurse(0, [])
@@ -414,29 +425,33 @@ class RuleBasedClassifier:
         base.fit(X, y)
 
         raw_rules = self._extract_rules(base, feature_names)
-        scored    = []
+        scored = []
         for conditions, label in raw_rules:
             mask = np.ones(X.shape[0], dtype=bool)
             for feat, thr, direction in conditions:
-                if direction == "left":  mask &= X[:, feat] <= thr
-                else:                    mask &= X[:, feat] > thr
+                if direction == "left":
+                    mask &= X[:, feat] <= thr
+                else:
+                    mask &= X[:, feat] > thr
             n_covered = mask.sum()
             if n_covered >= 5:
-                n_correct  = (y[mask] == label).sum()
+                n_correct = (y[mask] == label).sum()
                 confidence = n_correct / n_covered
                 scored.append((confidence, n_covered, conditions, label))
 
         scored.sort(key=lambda x: (-x[0], -x[1]))
-        self.rules         = [(cond, lbl) for _, _, cond, lbl in scored[:20]]
-        vals, counts       = np.unique(y, return_counts=True)
-        self.default       = int(vals[np.argmax(counts)])
+        self.rules = [(cond, lbl) for _, _, cond, lbl in scored[:20]]
+        vals, counts = np.unique(y, return_counts=True)
+        self.default = int(vals[np.argmax(counts)])
         self.feature_names = feature_names
         return self
 
     def _apply_rule(self, x, conditions):
         for feat, thr, direction in conditions:
-            if direction == "left"  and x[feat] > thr:  return False
-            if direction == "right" and x[feat] <= thr: return False
+            if direction == "left" and x[feat] > thr:
+                return False
+            if direction == "right" and x[feat] <= thr:
+                return False
         return True
 
     def predict(self, X):
@@ -461,10 +476,10 @@ class RuleBasedClassifier:
             parts = []
             for feat, thr, direction in conditions:
                 fname = self.feature_names[feat] if self.feature_names else f"F{feat}"
-                op    = "<=" if direction == "left" else ">"
+                op = "<=" if direction == "left" else ">"
                 parts.append(f"{fname} {op} {thr:.2f}")
             cls_name = LABEL_NAMES.get(label, str(label))
-            print(f"  Rule {i+1}: IF {' AND '.join(parts)} → {cls_name.upper()}")
+            print(f"  Rule {i + 1}: IF {' AND '.join(parts)} → {cls_name.upper()}")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -473,88 +488,89 @@ class RuleBasedClassifier:
 
 _LWR_KEY = "Locally Weighted\nRegression"
 
+
 def train_all_models(X_train, X_test, y_train, y_test, feature_names):
     print("\n  [3/7] Training all 6 models...\n")
     report = {}
 
     # Model 1: LWR
     print("  ▶ Model 1/6 : Locally Weighted Regression (LWR)")
-    t0  = time.time()
+    t0 = time.time()
     lwr = LocallyWeightedRegression(tau=0.8, max_train_samples=1000)
     preds_lwr = lwr.predict(X_train, y_train, X_test)
-    acc_lwr   = accuracy_score(y_test, preds_lwr)
-    t1  = time.time()
-    print(f"      ✓ Accuracy: {acc_lwr*100:.2f}%  |  Time: {t1-t0:.1f}s")
+    acc_lwr = accuracy_score(y_test, preds_lwr)
+    t1 = time.time()
+    print(f"      ✓ Accuracy: {acc_lwr * 100:.2f}%  |  Time: {t1 - t0:.1f}s")
     report[_LWR_KEY] = {
-        "accuracy": acc_lwr, "time": round(t1-t0, 2),
+        "accuracy": acc_lwr, "time": round(t1 - t0, 2),
         "model": lwr, "preds": preds_lwr,
         "lwr_train_data": (X_train, y_train),
     }
 
     # Model 2: Weighted Regression
     print("  ▶ Model 2/6 : Weighted Regression (distance weights)")
-    t0  = time.time()
-    wr  = WeightedRegression(strategy="distance")
+    t0 = time.time()
+    wr = WeightedRegression(strategy="distance")
     wr.fit(X_train, y_train)
     preds_wr = wr.predict(X_test)
-    acc_wr   = accuracy_score(y_test, preds_wr)
-    t1  = time.time()
-    print(f"      ✓ Accuracy: {acc_wr*100:.2f}%  |  Time: {t1-t0:.2f}s")
+    acc_wr = accuracy_score(y_test, preds_wr)
+    t1 = time.time()
+    print(f"      ✓ Accuracy: {acc_wr * 100:.2f}%  |  Time: {t1 - t0:.2f}s")
     report["Weighted\nRegression"] = {
-        "accuracy": acc_wr, "time": round(t1-t0, 2), "model": wr, "preds": preds_wr
+        "accuracy": acc_wr, "time": round(t1 - t0, 2), "model": wr, "preds": preds_wr
     }
 
     # Model 3: SVM
     print("  ▶ Model 3/6 : SVM Classifier (auto kernel selection)")
-    t0  = time.time()
+    t0 = time.time()
     svm = SVMClassifier()
     svm.fit_best(X_train, y_train, X_test, y_test)
     preds_svm = svm.predict(X_test)
-    acc_svm   = svm.score(X_test, y_test)
-    t1  = time.time()
-    print(f"      ✓ Best kernel: {svm.best_kernel} | Accuracy: {acc_svm*100:.2f}%  |  Time: {t1-t0:.2f}s")
+    acc_svm = svm.score(X_test, y_test)
+    t1 = time.time()
+    print(f"      ✓ Best kernel: {svm.best_kernel} | Accuracy: {acc_svm * 100:.2f}%  |  Time: {t1 - t0:.2f}s")
     report["SVM\nClassifier"] = {
-        "accuracy": acc_svm, "time": round(t1-t0, 2), "model": svm, "preds": preds_svm
+        "accuracy": acc_svm, "time": round(t1 - t0, 2), "model": svm, "preds": preds_svm
     }
 
     # Model 4: Clustering
     print("  ▶ Model 4/6 : Clustering (KMeans → label mapping)")
-    t0   = time.time()
+    t0 = time.time()
     clst = ClusteringClassifier(n_clusters=12)
     clst.fit(X_train, y_train)
     preds_clst = clst.predict(X_test)
-    acc_clst   = clst.score(X_test, y_test)
-    t1   = time.time()
-    print(f"      ✓ Accuracy: {acc_clst*100:.2f}%  |  Time: {t1-t0:.2f}s")
+    acc_clst = clst.score(X_test, y_test)
+    t1 = time.time()
+    print(f"      ✓ Accuracy: {acc_clst * 100:.2f}%  |  Time: {t1 - t0:.2f}s")
     report["Clustering\n(KMeans)"] = {
-        "accuracy": acc_clst, "time": round(t1-t0, 2), "model": clst, "preds": preds_clst
+        "accuracy": acc_clst, "time": round(t1 - t0, 2), "model": clst, "preds": preds_clst
     }
 
     # Model 5: Decision Tree
     print("  ▶ Model 5/6 : Decision Tree Rule Learning")
-    t0  = time.time()
-    dt  = DecisionTreeRuleLearner(max_depth=6)
+    t0 = time.time()
+    dt = DecisionTreeRuleLearner(max_depth=6)
     dt.fit(X_train, y_train, feature_names)
     preds_dt = dt.predict(X_test)
-    acc_dt   = dt.score(X_test, y_test)
-    t1  = time.time()
-    print(f"      ✓ Accuracy: {acc_dt*100:.2f}%  |  Time: {t1-t0:.2f}s")
+    acc_dt = dt.score(X_test, y_test)
+    t1 = time.time()
+    print(f"      ✓ Accuracy: {acc_dt * 100:.2f}%  |  Time: {t1 - t0:.2f}s")
     report["Decision Tree\nRule Learning"] = {
-        "accuracy": acc_dt, "time": round(t1-t0, 2), "model": dt, "preds": preds_dt
+        "accuracy": acc_dt, "time": round(t1 - t0, 2), "model": dt, "preds": preds_dt
     }
 
     # Model 6: Rule-Based
     print("  ▶ Model 6/6 : Rule-Based Classifier (RIPPER-style)")
-    t0  = time.time()
+    t0 = time.time()
     rbc = RuleBasedClassifier()
     rbc.fit(X_train, y_train, feature_names)
     preds_rbc = rbc.predict(X_test)
-    acc_rbc   = rbc.score(X_test, y_test)
-    t1  = time.time()
-    print(f"      ✓ Accuracy: {acc_rbc*100:.2f}%  |  Time: {t1-t0:.2f}s")
+    acc_rbc = rbc.score(X_test, y_test)
+    t1 = time.time()
+    print(f"      ✓ Accuracy: {acc_rbc * 100:.2f}%  |  Time: {t1 - t0:.2f}s")
     rbc.print_top_rules(n=5)
     report["Rule-Based\nClassifier"] = {
-        "accuracy": acc_rbc, "time": round(t1-t0, 2), "model": rbc, "preds": preds_rbc
+        "accuracy": acc_rbc, "time": round(t1 - t0, 2), "model": rbc, "preds": preds_rbc
     }
 
     return report
@@ -567,23 +583,23 @@ def train_all_models(X_train, X_test, y_train, y_test, feature_names):
 def visualize_results(report, y_test, feature_names):
     print("\n  [6/7] Generating visualizations...")
 
-    names     = list(report.keys())
-    accs      = [v["accuracy"] * 100 for v in report.values()]
-    times     = [v["time"] for v in report.values()]
+    names = list(report.keys())
+    accs = [v["accuracy"] * 100 for v in report.values()]
+    times = [v["time"] for v in report.values()]
     # Use same tiebreaker: highest accuracy, then fastest time
     best_idx = min(
-    range(len(names)),
-    key=lambda i: (-accs[i], times[i])
+        range(len(names)),
+        key=lambda i: (-accs[i], times[i])
     )
     best_name = names[best_idx].replace("\n", " ")
-    colors    = ["#4CAF50" if i == best_idx else "#5B9BD5" for i in range(len(names))]
+    colors = ["#4CAF50" if i == best_idx else "#5B9BD5" for i in range(len(names))]
 
     fig = plt.figure(figsize=(20, 14))
     fig.patch.set_facecolor("#F7F9FC")
-    gs  = gridspec.GridSpec(3, 3, figure=fig, hspace=0.55, wspace=0.4)
+    gs = gridspec.GridSpec(3, 3, figure=fig, hspace=0.55, wspace=0.4)
 
     # Accuracy bar chart
-    ax1  = fig.add_subplot(gs[0, :2])
+    ax1 = fig.add_subplot(gs[0, :2])
     bars = ax1.bar(names, accs, color=colors, edgecolor="white", linewidth=1.2, zorder=3)
     ax1.set_ylim(0, 115)
     ax1.set_ylabel("Accuracy (%)", fontsize=12)
@@ -593,7 +609,7 @@ def visualize_results(report, y_test, feature_names):
     ax1.grid(axis="y", alpha=0.4, zorder=0)
     ax1.set_facecolor("#FAFBFC")
     for bar, acc in zip(bars, accs):
-        ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1.5,
+        ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.5,
                  f"{acc:.1f}%", ha="center", va="bottom", fontsize=10, fontweight="bold")
     ax1.text(0.98, 0.95, f"★ Best: {best_name}", transform=ax1.transAxes,
              ha="right", va="top", fontsize=10, color="#4CAF50", fontweight="bold")
@@ -613,11 +629,11 @@ def visualize_results(report, y_test, feature_names):
     sorted_models = sorted(report.items(), key=lambda x: -x[1]["accuracy"])
     for idx, (name, data) in enumerate(sorted_models[:3]):
         ax = fig.add_subplot(gs[1, idx])
-        cm   = confusion_matrix(y_test, data["preds"],
-                                labels=sorted(LABEL_NAMES.keys()))
+        cm = confusion_matrix(y_test, data["preds"],
+                              labels=sorted(LABEL_NAMES.keys()))
         disp = ConfusionMatrixDisplay(cm, display_labels=class_display)
         disp.plot(ax=ax, colorbar=False, cmap="Blues")
-        ax.set_title(f"{name.replace(chr(10), ' ')}\nAcc: {data['accuracy']*100:.1f}%",
+        ax.set_title(f"{name.replace(chr(10), ' ')}\nAcc: {data['accuracy'] * 100:.1f}%",
                      fontsize=10, fontweight="bold")
         ax.set_xlabel("Predicted", fontsize=9)
         ax.set_ylabel("Actual", fontsize=9)
@@ -628,27 +644,27 @@ def visualize_results(report, y_test, feature_names):
     dt_key = "Decision Tree\nRule Learning"
     if dt_key in report:
         ax6 = fig.add_subplot(gs[2, :2])
-        imp  = report[dt_key]["model"].feature_importance_dict()
+        imp = report[dt_key]["model"].feature_importance_dict()
         sorted_pairs = sorted(zip(imp.values(), imp.keys()), reverse=True)
         feat_vals_s, feat_names_s = zip(*sorted_pairs)
         colors_fi = plt.cm.RdYlGn(np.linspace(0.3, 0.9, len(feat_names_s)))
-        bars_fi   = ax6.barh(feat_names_s, feat_vals_s, color=colors_fi, edgecolor="white")
+        bars_fi = ax6.barh(feat_names_s, feat_vals_s, color=colors_fi, edgecolor="white")
         ax6.set_title("Feature Importances (Decision Tree) — User Behaviour 8 Features",
                       fontsize=12, fontweight="bold")
         ax6.set_xlabel("Importance Score", fontsize=11)
         ax6.set_facecolor("#FAFBFC")
         ax6.grid(axis="x", alpha=0.4)
         for bar, val in zip(bars_fi, feat_vals_s):
-            ax6.text(bar.get_width() + 0.002, bar.get_y() + bar.get_height()/2,
+            ax6.text(bar.get_width() + 0.002, bar.get_y() + bar.get_height() / 2,
                      f"{val:.3f}", va="center", fontsize=9)
 
     # Summary table
     ax7 = fig.add_subplot(gs[2, 2])
     ax7.axis("off")
-    lines = [("Algorithm", "Accuracy", "Time(s)"), ("─"*12, "─"*8, "─"*6)]
+    lines = [("Algorithm", "Accuracy", "Time(s)"), ("─" * 12, "─" * 8, "─" * 6)]
     for name, data in sorted(report.items(), key=lambda x: -x[1]["accuracy"]):
         lines.append((name.replace("\n", " "),
-                      f"{data['accuracy']*100:.1f}%", f"{data['time']:.2f}s"))
+                      f"{data['accuracy'] * 100:.1f}%", f"{data['time']:.2f}s"))
     table_text = "\n".join(f"{a:<26} {b:<10} {c}" for a, b, c in lines)
     ax7.text(0.05, 0.95, "Summary Table", transform=ax7.transAxes,
              fontsize=11, fontweight="bold", va="top")
@@ -700,22 +716,21 @@ def save_best_model(report, scaler):
     tied = [k for k in eligible if eligible[k]["accuracy"] == best_data["accuracy"]]
     if len(tied) > 1:
         print(f"      ℹ Tiebreak on accuracy — selected fastest among: {[k.replace(chr(10), ' ') for k in tied]}")
-    
 
     bundle = {
-        "model_name" : best_name.replace("\n", " "),
-        "accuracy"   : best_data["accuracy"],
-        "model"      : best_data["model"],
-        "scaler"     : scaler,
-        "features"   : SELECTED_FEATURES,
-        "labels"     : LABEL_NAMES,
-        "dataset"    : "user_behaviour_dataset.csv",
+        "model_name": best_name.replace("\n", " "),
+        "accuracy": best_data["accuracy"],
+        "model": best_data["model"],
+        "scaler": scaler,
+        "features": SELECTED_FEATURES,
+        "labels": LABEL_NAMES,
+        "dataset": "user_behaviour_dataset.csv",
         "lwr_excluded": "LWR excluded — lazy learner, requires train data at prediction time.",
     }
 
     joblib.dump(bundle, "best_model.pkl")
     print(f"      ✓ Best model : {best_name.replace(chr(10), ' ')}")
-    print(f"      ✓ Accuracy   : {best_data['accuracy']*100:.2f}%")
+    print(f"      ✓ Accuracy   : {best_data['accuracy'] * 100:.2f}%")
     print(f"      ✓ Saved to   : best_model.pkl")
     print(f"      ℹ LWR excluded from selection (lazy learner)")
     return best_name, best_data["accuracy"]
@@ -739,10 +754,10 @@ def print_final_report(report):
     )
 
     for i, (name, data) in enumerate(sorted_models):
-        is_best  = (i == 0 and name != _LWR_KEY)
-        star     = " ← BEST ★" if is_best else ""
+        is_best = (i == 0 and name != _LWR_KEY)
+        star = " ← BEST ★" if is_best else ""
         saveable = "No (LWR)" if name == _LWR_KEY else "Yes"
-        print(f"  {name.replace(chr(10), ' '):<30} {data['accuracy']*100:>9.2f}%"
+        print(f"  {name.replace(chr(10), ' '):<30} {data['accuracy'] * 100:>9.2f}%"
               f"  {data['time']:>6.2f}s  {saveable:>8}{star}")
     print("═" * 62)
 
