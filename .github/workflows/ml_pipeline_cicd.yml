@@ -1,0 +1,320 @@
+name: ML Pipeline CI/CD — User Behaviour Classification
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:   # allows manual trigger from GitHub UI
+
+# ─────────────────────────────────────────────
+# ENVIRONMENT VARIABLES
+# ─────────────────────────────────────────────
+env:
+  PYTHON_VERSION: "3.10"
+  DATASET_FILE: "user_behaviour_dataset.csv"
+  MODEL_ARTIFACT: "best_model.pkl"
+  DASHBOARD_ARTIFACT: "ml_results_dashboard.png"
+
+jobs:
+
+  # ══════════════════════════════════════════
+  # JOB 1 — Lint & Code Quality
+  # ══════════════════════════════════════════
+  lint:
+    name: 🔍 Lint & Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lint-
+
+      - name: Install linting tools
+        run: |
+          pip install --upgrade pip
+          pip install flake8 black isort
+
+      - name: Run flake8 (style + syntax errors)
+        run: |
+          flake8 . \
+            --max-line-length=120 \
+            --exclude=.git,__pycache__,.venv \
+            --statistics \
+            --count
+
+      - name: Check Black formatting
+        run: |
+          black --check --line-length=120 .
+
+      - name: Check isort import ordering
+        run: |
+          isort --check-only --line-length=120 .
+
+
+  # ══════════════════════════════════════════
+  # JOB 2 — Install & Test Dependencies
+  # ══════════════════════════════════════════
+  install-and-test:
+    name: 📦 Install Dependencies & Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install project dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify key imports
+        run: |
+          python -c "
+          import sklearn, numpy, pandas, matplotlib, joblib
+          print('✓ sklearn  :', sklearn.__version__)
+          print('✓ numpy    :', numpy.__version__)
+          print('✓ pandas   :', pandas.__version__)
+          print('✓ matplotlib:', matplotlib.__version__)
+          print('✓ joblib   :', joblib.__version__)
+          "
+
+      - name: Run unit tests (if tests/ exists)
+        run: |
+          if [ -d "tests" ]; then
+            pip install pytest pytest-cov
+            pytest tests/ -v --tb=short --cov=. --cov-report=xml
+          else
+            echo "⚠ No tests/ directory found — skipping pytest"
+          fi
+
+
+  # ══════════════════════════════════════════
+  # JOB 3 — Train ML Models
+  # ══════════════════════════════════════════
+  train:
+    name: 🤖 Train ML Models
+    runs-on: ubuntu-latest
+    needs: install-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check dataset availability
+        run: |
+          if [ ! -f "${{ env.DATASET_FILE }}" ]; then
+            echo "✗ ERROR: Dataset '${{ env.DATASET_FILE }}' not found!"
+            echo "→ Add it to your repo root or adjust DATASET_FILE env variable."
+            exit 1
+          fi
+          echo "✓ Dataset found: $(wc -l < ${{ env.DATASET_FILE }}) rows"
+
+      - name: Train all 6 ML models
+        run: |
+          # Use a non-interactive matplotlib backend (no display needed in CI)
+          export MPLBACKEND=Agg
+          python ml_pipeline.py
+
+      - name: Verify outputs exist
+        run: |
+          echo "── Checking expected outputs ──"
+          [ -f "${{ env.MODEL_ARTIFACT }}" ]   && echo "✓ best_model.pkl found"   || (echo "✗ best_model.pkl missing" && exit 1)
+          [ -f "${{ env.DASHBOARD_ARTIFACT }}" ] && echo "✓ Dashboard PNG found" || (echo "✗ Dashboard PNG missing" && exit 1)
+
+      - name: Log model accuracy
+        run: |
+          python -c "
+          import joblib
+          bundle = joblib.load('best_model.pkl')
+          print(f'Best model   : {bundle[\"model_name\"]}')
+          print(f'Accuracy     : {bundle[\"accuracy\"]*100:.2f}%')
+          print(f'Features     : {bundle[\"features\"]}')
+          "
+
+      - name: Upload best_model.pkl as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: best-model
+          path: ${{ env.MODEL_ARTIFACT }}
+          retention-days: 30
+
+      - name: Upload dashboard image as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-dashboard
+          path: ${{ env.DASHBOARD_ARTIFACT }}
+          retention-days: 30
+
+
+  # ══════════════════════════════════════════
+  # JOB 4 — Model Validation Gate
+  # ══════════════════════════════════════════
+  validate:
+    name: ✅ Model Validation Gate
+    runs-on: ubuntu-latest
+    needs: train
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download best_model.pkl
+        uses: actions/download-artifact@v4
+        with:
+          name: best-model
+
+      - name: Validate model accuracy threshold (≥ 75%)
+        run: |
+          python -c "
+          import joblib, sys
+          bundle   = joblib.load('best_model.pkl')
+          accuracy = bundle['accuracy'] * 100
+          threshold = 75.0
+
+          print(f'Model      : {bundle[\"model_name\"]}')
+          print(f'Accuracy   : {accuracy:.2f}%')
+          print(f'Threshold  : {threshold}%')
+
+          if accuracy < threshold:
+              print(f'✗ FAILED — accuracy {accuracy:.2f}% is below {threshold}% threshold!')
+              sys.exit(1)
+          else:
+              print(f'✓ PASSED — accuracy meets deployment threshold.')
+          "
+
+      - name: Validate model can load and predict
+        run: |
+          python -c "
+          import joblib, numpy as np
+          bundle = joblib.load('best_model.pkl')
+          scaler = bundle['scaler']
+          model  = bundle['model']
+
+          # Dummy input: 8 features
+          X_dummy = np.array([[120, 5.0, 1500, 30, 500, 25, 1, 1]])
+          X_scaled = scaler.transform(X_dummy)
+
+          # LWR needs special handling (lazy learner — skip prediction test)
+          model_name = bundle['model_name']
+          if 'Locally Weighted' not in model_name:
+              pred = model.predict(X_scaled)
+              label_map = bundle['labels']
+              print(f'✓ Prediction test passed → class {pred[0]} ({label_map[pred[0]]})')
+          else:
+              print('ℹ LWR model — prediction test skipped (lazy learner).')
+          "
+
+
+  # ══════════════════════════════════════════
+  # JOB 5 — Deploy / Release (main only)
+  # ══════════════════════════════════════════
+  deploy:
+    name: 🚀 Deploy Best Model
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download best_model.pkl
+        uses: actions/download-artifact@v4
+        with:
+          name: best-model
+
+      - name: Download dashboard image
+        uses: actions/download-artifact@v4
+        with:
+          name: ml-dashboard
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "model-v${{ github.run_number }}"
+          name: "ML Model Release #${{ github.run_number }}"
+          body: |
+            ## 🤖 User Behaviour Classification Model
+
+            **Triggered by**: Push to `main` (commit `${{ github.sha }}`)
+
+            ### Artifacts
+            - `best_model.pkl` — Trained scikit-learn model bundle
+            - `ml_results_dashboard.png` — Model comparison dashboard
+
+            ### Model Info
+            - Dataset: `user_behaviour_dataset.csv`
+            - Target: Low / Medium / High behaviour classes
+            - Features: 8 selected (App_Usage_Time, Screen_On_Time, Battery_Drain, Num_Apps_Installed, Data_Usage, Age, Gender, OS)
+            - Algorithms evaluated: LWR, Weighted Regression, SVM, KMeans, Decision Tree, Rule-Based
+
+            > Auto-deployed by GitHub Actions CI/CD Pipeline
+          files: |
+            best_model.pkl
+            ml_results_dashboard.png
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deployment success summary
+        run: |
+          echo "════════════════════════════════════════"
+          echo "  ✓ Model deployed as Release v${{ github.run_number }}"
+          echo "  ✓ Artifacts attached to GitHub Release"
+          echo "════════════════════════════════════════"

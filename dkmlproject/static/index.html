@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BehaviourIQ · User Behaviour Classifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #F4F6FB;
+  --bg2:       #ECEEF7;
+  --white:     #FFFFFF;
+  --ink:       #0D1226;
+  --ink2:      #2A3050;
+  --muted:     #8891B0;
+  --border:    #D8DCF0;
+  --accent:    #2563EB;
+  --accent-lt: #EEF3FF;
+  --accent2:   #0EA5E9;
+  --green:     #10B981;
+  --green-lt:  #ECFDF5;
+  --amber:     #F59E0B;
+  --amber-lt:  #FFFBEB;
+  --red:       #EF4444;
+  --red-lt:    #FEF2F2;
+  --shadow:    0 2px 16px rgba(13,18,38,0.09);
+  --shadow-lg: 0 8px 40px rgba(13,18,38,0.13);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Background texture ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 800px 600px at 10% 0%, rgba(37,99,235,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 600px 500px at 90% 100%, rgba(14,165,233,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 400px 400px at 60% 40%, rgba(16,185,129,0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* subtle dot grid */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image: radial-gradient(circle, rgba(37,99,235,0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* ── Layout ── */
+.page {
+  position: relative; z-index: 1;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 28px 100px;
+}
+
+/* ── Header ── */
+header {
+  padding: 52px 0 40px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 48px;
+}
+
+.logo-block {}
+.logo-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 20px; height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.logo-word {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--ink);
+}
+.logo-word em {
+  font-style: normal;
+  color: var(--accent);
+}
+.logo-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 8px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 20px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  font-size: 0.77rem;
+  font-weight: 500;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--white);
+  box-shadow: var(--shadow);
+  transition: all 0.4s;
+}
+.status-pill.ready {
+  border-color: #6EE7B7;
+  color: var(--green);
+  background: var(--green-lt);
+}
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.4s;
+}
+.status-pill.ready .status-dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.25);
+  animation: pulse-dot 2s ease infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { box-shadow: 0 0 0 3px rgba(16,185,129,0.25); }
+  50%      { box-shadow: 0 0 0 6px rgba(16,185,129,0.1); }
+}
+
+/* ── Section label ── */
+.sect-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.sect-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--white);
+  background: var(--accent);
+  padding: 3px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+}
+.sect-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sect-line {
+  flex: 1;
+  height: 1.5px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* ── Card ── */
+.card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 36px;
+  box-shadow: var(--shadow);
+  margin-bottom: 32px;
+}
+
+/* ── Form grid ── */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px 28px;
+  margin-bottom: 28px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink2);
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.unit-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--muted);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 1px 7px;
+  border-radius: 4px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* slider wrapper */
+.slider-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slider-track {
+  position: relative;
+  height: 6px;
+  background: var(--bg2);
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  top: 50%; left: 0;
+  transform: translateY(-50%);
+  width: 100%; height: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--white);
+  border: 2.5px solid var(--accent);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+  cursor: pointer;
+  transition: all 0.18s;
+}
+input[type=range]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 16px rgba(37,99,235,0.4);
+}
+input[type=range]::-moz-range-thumb {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--white);
+  border: 2.5px solid var(--accent);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+  cursor: pointer;
+}
+
+.slider-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.range-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-lt);
+  border: 1px solid rgba(37,99,235,0.18);
+  padding: 3px 10px;
+  border-radius: 6px;
+  min-width: 56px;
+  text-align: center;
+}
+.range-max {
+  font-size: 0.65rem;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Divider ── */
+.divider {
+  height: 1.5px;
+  background: var(--bg2);
+  border-radius: 2px;
+  margin: 28px 0;
+  border: none;
+}
+
+/* ── Toggle row ── */
+.toggle-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+.toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.toggle-btns {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid var(--border);
+  background: var(--bg2);
+}
+.toggle-btn {
+  flex: 1;
+  padding: 12px 0;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.toggle-btn + .toggle-btn { border-left: 1.5px solid var(--border); }
+.toggle-btn.active {
+  background: var(--accent);
+  color: var(--white);
+  font-weight: 600;
+}
+.toggle-btn:hover:not(.active) { background: var(--accent-lt); color: var(--accent); }
+
+/* ── Predict button ── */
+.btn-predict {
+  width: 100%;
+  padding: 18px;
+  background: linear-gradient(135deg, var(--accent) 0%, #1D4ED8 100%);
+  color: var(--white);
+  border: none;
+  border-radius: 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.25s;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(37,99,235,0.35);
+}
+.btn-predict::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+  transform: translateX(-100%);
+  transition: transform 0.55s;
+}
+.btn-predict:hover::after { transform: translateX(100%); }
+.btn-predict:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(37,99,235,0.45);
+}
+.btn-predict:active { transform: translateY(0); box-shadow: 0 2px 12px rgba(37,99,235,0.3); }
+.btn-predict:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.spin {
+  display: none;
+  width: 18px; height: 18px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Error card ── */
+.error-card {
+  background: var(--red-lt);
+  border: 1.5px solid #FECACA;
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: #DC2626;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.error-card.visible { opacity: 1; pointer-events: auto; }
+
+/* ── Result panel ── */
+#result-panel {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  pointer-events: none;
+  max-height: 0;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+#result-panel.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  max-height: 9999px;
+  overflow: visible;
+  margin-bottom: 32px;
+}
+
+.result-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+}
+
+/* Top accent stripe */
+.result-stripe {
+  height: 5px;
+  background: var(--green);
+  transition: background 0.4s;
+}
+.result-card.class-1 .result-stripe { background: var(--accent); }
+.result-card.class-2 .result-stripe { background: var(--red); }
+
+.result-body {
+  padding: 36px;
+}
+
+.result-top {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.result-icon-wrap {
+  width: 88px; height: 88px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  flex-shrink: 0;
+  background: var(--green-lt);
+  border: 2px solid #A7F3D0;
+  transition: all 0.4s;
+}
+.result-card.class-1 .result-icon-wrap {
+  background: var(--accent-lt);
+  border-color: #BFDBFE;
+}
+.result-card.class-2 .result-icon-wrap {
+  background: var(--red-lt);
+  border-color: #FECACA;
+}
+
+.result-headline {}
+.result-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 6px;
+  transition: color 0.4s;
+}
+.result-card.class-1 .result-tag { color: var(--accent); }
+.result-card.class-2 .result-tag { color: var(--red); }
+
+.result-verdict {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.result-sub {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-top: 6px;
+  font-weight: 400;
+}
+.result-desc {
+  font-size: 0.86rem;
+  color: var(--ink2);
+  line-height: 1.65;
+  margin-top: 10px;
+  max-width: 400px;
+}
+
+/* meter */
+.meter-section {
+  margin-bottom: 24px;
+}
+.meter-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.meter-track {
+  height: 10px;
+  background: var(--bg2);
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.meter-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--green);
+  width: 0%;
+  transition: width 0.7s cubic-bezier(.22,.68,0,1.2), background 0.4s;
+}
+.result-card.class-1 .meter-fill { background: var(--accent); }
+.result-card.class-2 .meter-fill { background: var(--red); }
+
+/* meta chips */
+.result-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 20px;
+  border-top: 1.5px solid var(--bg2);
+}
+.meta-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-width: 100px;
+}
+.meta-chip-key {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.meta-chip-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* ── Footer ── */
+footer {
+  border-top: 1.5px solid var(--border);
+  padding-top: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.footer-text {
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.footer-text strong { color: var(--accent); font-weight: 600; }
+.model-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 5px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 100px;
+  background: var(--white);
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .form-grid { grid-template-columns: 1fr 1fr; }
+  .toggle-row { grid-template-columns: 1fr; }
+  .logo-word { font-size: 2.2rem; }
+  .card { padding: 24px 18px; }
+  .result-body { padding: 24px 20px; }
+  .result-verdict { font-size: 2rem; }
+}
+@media (max-width: 480px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Page entry animation ── */
+.page > * {
+  animation: fadeUp 0.5s ease both;
+}
+header { animation-delay: 0s; }
+.sect-label:first-of-type { animation-delay: 0.1s; }
+.card { animation-delay: 0.15s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-block">
+      <div class="logo-eyebrow">ML Classifier</div>
+      <div class="logo-word">Behaviour<em>IQ</em></div>
+      <div class="logo-sub">User Behaviour Classification · Powered by scikit-learn</div>
+    </div>
+    <div class="status-pill" id="status-pill">
+      <div class="status-dot"></div>
+      <span id="status-text">Checking model…</span>
+    </div>
+  </header>
+
+  <!-- RESULT PANEL -->
+  <div id="result-panel">
+    <div class="sect-label">
+      <span class="sect-num">→</span>
+      <span class="sect-title">Prediction Result</span>
+      <div class="sect-line"></div>
+    </div>
+    <div class="result-card" id="result-card">
+      <div class="result-stripe"></div>
+      <div class="result-body">
+        <div class="result-top">
+          <div class="result-icon-wrap" id="result-icon">?</div>
+          <div class="result-headline">
+            <div class="result-tag" id="result-tag">Behaviour Class</div>
+            <div class="result-verdict" id="result-verdict">—</div>
+            <div class="result-sub" id="result-usage">Usage Class</div>
+            <div class="result-desc" id="result-desc"></div>
+          </div>
+        </div>
+
+        <div class="meter-section">
+          <div class="meter-header">
+            <span>Low</span><span>Medium</span><span>High</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill" id="meter-fill"></div>
+          </div>
+        </div>
+
+        <div class="result-meta">
+          <div class="meta-chip">
+            <div class="meta-chip-key">Model</div>
+            <div class="meta-chip-val" id="meta-model">—</div>
+          </div>
+          <div class="meta-chip">
+            <div class="meta-chip-key">Accuracy</div>
+            <div class="meta-chip-val" id="meta-acc">—</div>
+          </div>
+          <div class="meta-chip">
+            <div class="meta-chip-key">Class</div>
+            <div class="meta-chip-val" id="meta-class">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <div class="sect-label">
+    <span class="sect-num">01</span>
+    <span class="sect-title">User Metrics</span>
+    <div class="sect-line"></div>
+  </div>
+  <div class="card">
+
+    <div class="form-grid">
+
+      <!-- App Usage -->
+      <div class="field">
+        <div class="field-label">App Usage Time <span class="unit-badge">(minutes/day)</span></div>
+        <div class="slider-wrap">
+          <div class="slider-track">
+            <input type="range" id="s_app" min="0" max="600" value="120"
+                   oninput="updateSlider('v_app', this.value)">
+          </div>
+          <div class="slider-footer">
+            <div class="range-val" id="v_app">120</div>
+            <span class="range-max">max 600</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen On Time -->
+      <div class="field">
+        <div class="field-label">Screen On Time <span class="unit-badge">(hours/day)</span></div>
+        <div class="slider-wrap">
+          <div class="slider-track">
+            <input type="range" id="s_screen" min="0" max="24" step="0.1" value="5"
+                   oninput="updateSlider('v_screen', parseFloat(this.value).toFixed(1))">
+          </div>
+          <div class="slider-footer">
+            <div class="range-val" id="v_screen">5.0</div>
+            <span class="range-max">max 24</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Battery Drain -->
+      <div class="field">
+        <div class="field-label">Battery Drain <span class="unit-badge">(mAh/day)</span></div>
+        <div class="slider-wrap">
+          <div class="slider-track">
+            <input type="range" id="s_battery" min="0" max="5000" step="50" value="1500"
+                   oninput="updateSlider('v_battery', this.value)">
+          </div>
+          <div class="slider-footer">
+            <div class="range-val" id="v_battery">1500</div>
+            <span class="range-max">max 5000</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Apps Installed -->
+      <div class="field">
+        <div class="field-label">Apps Installed <span class="unit-badge">(count)</span></div>
+        <div class="slider-wrap">
+          <div class="slider-track">
+            <input type="range" id="s_apps" min="1" max="200" value="40"
+                   oninput="updateSlider('v_apps', this.value)">
+          </div>
+          <div class="slider-footer">
+            <div class="range-val" id="v_apps">40</div>
+            <span class="range-max">max 200</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Usage -->
+      <div class="field">
+        <div class="field-label">Data Usage <span class="unit-badge">(MB/day)</span></div>
+        <div class="slider-wrap">
+          <div class="slider-track">
+            <input type="range" id="s_data" min="0" max="5000" step="50" value="500"
+                   oninput="updateSlider('v_data', this.value)">
+          </div>
+          <div class="slider-footer">
+            <div class="range-val" id="v_data">500</div>
+            <span class="range-max">max 5000</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Age -->
+      <div class="field">
+        <div class="field-label">Age <span class="unit-badge">(years)</span></div>
+        <div class="slider-wrap">
+          <div class="slider-track">
+            <input type="range" id="s_age" min="10" max="80" value="28"
+                   oninput="updateSlider('v_age', this.value)">
+          </div>
+          <div class="slider-footer">
+            <div class="range-val" id="v_age">28</div>
+            <span class="range-max">max 80</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <hr class="divider">
+
+    <!-- Toggles -->
+    <div class="toggle-row">
+      <div class="toggle-group">
+        <div class="field-label">Gender</div>
+        <div class="toggle-btns" id="tg-gender">
+          <button class="toggle-btn active" data-val="1" onclick="setToggle('tg-gender',this)">Male</button>
+          <button class="toggle-btn"        data-val="0" onclick="setToggle('tg-gender',this)">Female</button>
+        </div>
+      </div>
+      <div class="toggle-group">
+        <div class="field-label">Operating System</div>
+        <div class="toggle-btns" id="tg-os">
+          <button class="toggle-btn active" data-val="1" onclick="setToggle('tg-os',this)">Android</button>
+          <button class="toggle-btn"        data-val="0" onclick="setToggle('tg-os',this)">iOS</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Predict -->
+    <button class="btn-predict" id="predict-btn" onclick="predict()">
+      <div class="spin" id="btn-spin"></div>
+      <span id="btn-icon">⚡</span>
+      <span id="btn-label">Predict Behaviour Class</span>
+    </button>
+
+    <div class="error-card" id="error-card">
+      <span>⚠</span>
+      <span id="error-msg">Something went wrong.</span>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-text">BehaviourIQ · Powered by <strong>scikit-learn</strong> + Flask</div>
+    <div class="model-tag" id="footer-model">model: —</div>
+  </footer>
+
+</div>
+
+<script>
+const API_BASE = "http://127.0.0.1:5000";
+
+/* helpers */
+function updateSlider(id, val) {
+  document.getElementById(id).textContent = val;
+}
+function setToggle(gid, btn) {
+  document.querySelectorAll(`#${gid} .toggle-btn`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleVal(gid) {
+  const a = document.querySelector(`#${gid} .toggle-btn.active`);
+  return a ? parseInt(a.dataset.val) : 0;
+}
+
+/* health */
+async function checkHealth() {
+  const pill = document.getElementById('status-pill');
+  const txt  = document.getElementById('status-text');
+  try {
+    const r = await fetch(`${API_BASE}/health`);
+    const d = await r.json();
+    if (d.ready) {
+      pill.classList.add('ready');
+      txt.textContent = 'Model ready';
+      document.getElementById('footer-model').textContent = `model: ${d.model || 'best_model.pkl'}`;
+    } else {
+      txt.textContent = 'No model loaded';
+    }
+  } catch { txt.textContent = 'Server offline'; }
+}
+
+/* predict */
+async function predict() {
+  const btn    = document.getElementById('predict-btn');
+  const spin   = document.getElementById('btn-spin');
+  const icon   = document.getElementById('btn-icon');
+  const lbl    = document.getElementById('btn-label');
+  const errEl  = document.getElementById('error-card');
+  const errMsg = document.getElementById('error-msg');
+
+  errEl.classList.remove('visible');
+  btn.disabled = true;
+  spin.style.display = 'block';
+  icon.style.display = 'none';
+  lbl.textContent = 'Predicting…';
+
+  const payload = {
+    app_usage  : parseFloat(document.getElementById('s_app').value),
+    screen_on  : parseFloat(document.getElementById('s_screen').value),
+    battery    : parseFloat(document.getElementById('s_battery').value),
+    apps       : parseFloat(document.getElementById('s_apps').value),
+    data_usage : parseFloat(document.getElementById('s_data').value),
+    age        : parseFloat(document.getElementById('s_age').value),
+    gender     : toggleVal('tg-gender'),
+    os         : toggleVal('tg-os'),
+  };
+
+  try {
+    const res  = await fetch(`${API_BASE}/predict`, {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderResult(data);
+  } catch (err) {
+    errMsg.textContent = err.message || 'Could not reach the server.';
+    errEl.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    spin.style.display = 'none';
+    icon.style.display = 'inline';
+    lbl.textContent = 'Predict Behaviour Class';
+  }
+}
+
+/* render */
+const ICONS = { 0:'🌱', 1:'⚡', 2:'🔥' };
+const TAGS  = { 0:'Low Usage', 1:'Medium Usage', 2:'High Usage' };
+const DESCS = {
+  0: "This user shows minimal device engagement with healthy digital habits — well below average screen dependency.",
+  1: "This user demonstrates balanced, moderate usage patterns — typical of mainstream smartphone users.",
+  2: "This user exhibits heavy, high-frequency device engagement — strong digital dependency signals detected.",
+};
+const METER_W = { 0: '22%', 1: '55%', 2: '88%' };
+
+function renderResult(data) {
+  const cls   = data.class;
+  const panel = document.getElementById('result-panel');
+  const card  = document.getElementById('result-card');
+
+  card.className = `result-card class-${cls}`;
+
+  document.getElementById('result-icon').textContent    = ICONS[cls];
+  document.getElementById('result-tag').textContent     = TAGS[cls];
+  document.getElementById('result-verdict').textContent = data.label.toUpperCase();
+  document.getElementById('result-usage').textContent   = `Usage Behaviour · Class ${cls}`;
+  document.getElementById('result-desc').textContent    = data.description || DESCS[cls];
+  document.getElementById('meta-model').textContent     = data.model_name || '—';
+  document.getElementById('meta-acc').textContent       = data.accuracy ? `${data.accuracy}%` : '—';
+  document.getElementById('meta-class').textContent     = `${cls} — ${['Low','Medium','High'][cls]}`;
+
+  /* animate meter */
+  const fill = document.getElementById('meter-fill');
+  fill.style.width = '0%';
+  setTimeout(() => { fill.style.width = METER_W[cls]; }, 80);
+
+  panel.classList.add('visible');
+  setTimeout(() => panel.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
+}
+
+window.addEventListener('DOMContentLoaded', checkHealth);
+</script>
+</body>
+</html>
