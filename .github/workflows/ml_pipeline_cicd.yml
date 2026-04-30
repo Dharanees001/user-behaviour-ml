@@ -39,13 +39,13 @@ jobs:
         run: pip install flake8 black isort
 
       - name: flake8
-        run: flake8 dkmlproject/ --max-line-length=120 --exclude=__pycache__ --statistics --count
+        run: flake8 . --max-line-length=120 --exclude=__pycache__ --statistics --count
 
       - name: black
-        run: black --check --line-length=120 dkmlproject/
+        run: black --check --line-length=120 .
 
       - name: isort
-        run: isort --check-only --line-length=120 dkmlproject/
+        run: isort --check-only --line-length=120 .
 
 
   # ══════════════════════════════════════════
